@@ -20,9 +20,15 @@ AUDIO_DIR = DATA_DIR / "audio"
 DB_PATH = DATA_DIR / "app.db"
 HF_BASE = "https://huggingface.co/rhasspy/piper-voices/resolve/main/"
 MM_URL = "https://api.mymemory.translated.net/get?q={text}&langpair={src}|{dst}"
+LINGVA_URLS = [
+    "https://lingva.ml/api/v1/{src}/{dst}/{text}",
+    "https://lingva.lunar.icu/api/v1/{src}/{dst}/{text}",
+    "https://translate.plausibility.cloud/api/v1/{src}/{dst}/{text}",
+]
 MAX_TEXT = 100_000   # поддержка больших файлов
 SYN_CHUNK = 900      # размер куска для синтеза
 TR_CHUNK = 1000      # размер куска для перевода
+_tr_cache = {}
 
 # Отобранные голоса
 SELECT = [
@@ -86,11 +92,28 @@ def db():
         pass_hash TEXT NOT NULL, created REAL NOT NULL)""")
     con.execute("""CREATE TABLE IF NOT EXISTS history(
         id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL,
-        text TEXT NOT NULL, voice TEXT NOT NULL, audio TEXT NOT NULL,
+        text TEXT NOT NULL, voice TEXT NOT NULL, audio BLOB,
         created REAL NOT NULL)""")
     con.execute("""CREATE TABLE IF NOT EXISTS reviews(
         id INTEGER PRIMARY KEY, username TEXT NOT NULL, rating INTEGER NOT NULL,
         text TEXT NOT NULL, created REAL NOT NULL)""")
+    # миграция: audio было именем файла -> теперь BLOB
+    cols = {r[1]: r[2] for r in con.execute("PRAGMA table_info(history)")}
+    if cols.get("audio") == "TEXT":
+        con.execute("ALTER TABLE history RENAME TO history_old")
+        con.execute("""CREATE TABLE history(
+            id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL,
+            text TEXT NOT NULL, voice TEXT NOT NULL, audio BLOB,
+            created REAL NOT NULL)""")
+        for row in con.execute("SELECT * FROM history_old"):
+            blob = None
+            if row[4]:
+                f = AUDIO_DIR / row[4]
+                if f.exists():
+                    blob = f.read_bytes()
+            con.execute("INSERT INTO history VALUES(?,?,?,?,?,?)",
+                        (row[0], row[1], row[2], row[3], blob, row[5]))
+        con.execute("DROP TABLE history_old")
     return con
 
 # ---------- Голоса ----------
@@ -166,14 +189,55 @@ def detect_lang(text):
         return "ru"
     return code
 
-def _translate_chunk(chunk, src, dst):
-    url = MM_URL.format(text=urllib.parse.quote(chunk), src=src, dst=dst)
+def _http_json(url, timeout=30):
     req = urllib.request.Request(url, headers={"User-Agent": "ozvuchka/1.0"})
-    with urllib.request.urlopen(req, timeout=30) as r:
-        data = json.loads(r.read().decode("utf-8"))
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.loads(r.read().decode("utf-8"))
+
+def _mm_chunk(chunk, src, dst):
+    url = MM_URL.format(text=urllib.parse.quote(chunk), src=src, dst=dst)
+    data = _http_json(url)
     if data.get("quotaFinished") or data.get("responseStatus") != 200:
-        raise RuntimeError("лимит бесплатного переводчика исчерпан, попробуйте позже")
+        raise RuntimeError("лимит бесплатного переводчика исчерпан")
     return data["responseData"]["translatedText"]
+
+def _lingva_chunk(chunk, src, dst):
+    for tpl in LINGVA_URLS:
+        try:
+            url = tpl.format(src=src, dst=dst, text=urllib.parse.quote(chunk))
+            data = _http_json(url, timeout=20)
+            if isinstance(data, list) and data and data[0].get("translation"):
+                return "".join(t["translation"] for t in data)
+        except Exception:
+            continue
+    raise RuntimeError("lingva недоступен")
+
+def _translate_chunk(chunk, src, dst):
+    """MyMemory с ретраями на 429, затем запасные Lingva-инстансы, кэш."""
+    key = (src, dst, chunk)
+    if key in _tr_cache:
+        return _tr_cache[key]
+    last_err = None
+    for attempt in range(4):
+        try:
+            res = _mm_chunk(chunk, src, dst)
+            _tr_cache[key] = res
+            return res
+        except urllib.error.HTTPError as e:
+            last_err = e
+            if e.code == 429:
+                time.sleep(3 * (attempt + 1))
+                continue
+            break
+        except Exception as e:
+            last_err = e
+            break
+    try:
+        res = _lingva_chunk(chunk, src, dst)
+        _tr_cache[key] = res
+        return res
+    except Exception as e:
+        raise RuntimeError(f"переводчик недоступен: {last_err or e}")
 
 def translate_text(text, target_lang):
     """Переводит текст на язык голоса через MyMemory (авто-определение языка)."""
@@ -308,12 +372,9 @@ def do_generate(text, voice, tempo, do_translate, filename=None):
     return (mp3, final_text), None
 
 def save_history(user_id, text, voice, mp3):
-    rid = int(time.time() * 1000)
-    fname = f"{rid}.mp3"
-    (AUDIO_DIR / fname).write_bytes(mp3)
     con = db()
     con.execute("INSERT INTO history(user_id, text, voice, audio, created) VALUES(?,?,?,?,?)",
-                (user_id, text[:2000], voice, fname, time.time()))
+                (user_id, text[:2000], voice, mp3, time.time()))
     con.commit()
     con.close()
 
@@ -361,14 +422,18 @@ def generate_file():
     return send_file(io.BytesIO(mp3), mimetype="audio/mpeg",
                      download_name=Path(f.filename).stem + ".mp3")
 
-@app.get("/audio/<fname>")
-def audio(fname):
-    if not fname.endswith(".mp3") or "/" in fname or "\\" in fname:
+@app.get("/audio/<int:hid>")
+def audio(hid):
+    user = current_user()
+    if not user:
         return "not found", 404
-    p = AUDIO_DIR / fname
-    if not p.exists():
+    con = db()
+    row = con.execute("SELECT audio FROM history WHERE id=? AND user_id=?",
+                      (hid, user["id"])).fetchone()
+    con.close()
+    if not row or row["audio"] is None:
         return "not found", 404
-    return send_file(p, mimetype="audio/mpeg")
+    return send_file(io.BytesIO(row["audio"]), mimetype="audio/mpeg")
 
 if __name__ == "__main__":
     VOICES_DIR.mkdir(exist_ok=True)

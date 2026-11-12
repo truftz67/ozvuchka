@@ -149,7 +149,7 @@
         <div class="hist-meta">
           <span>{{ voices.get(h.voice, h.voice) }} • {{ h.created }}</span>
         </div>
-        <audio controls preload="none" src="/audio/{{ h.audio }}"></audio>
+        <audio controls preload="none" src="/audio/{{ h.id }}"></audio>
       </div>
       {% else %}
       <div class="sub">Пока пусто — сгенерируйте первую озвучку.</div>
