@@ -106,7 +106,8 @@
       <label>Или файл (.txt / .pdf)</label>
       <div class="drop" id="drop">
         <span id="dropText">Перетащите файл сюда</span>
-        <small>txt, pdf — текст подставится в поле выше</small>
+        <button type="button" id="dropClear" class="btn ghost" style="display:none;padding:4px 12px;font-size:12px;margin-top:6px">Убрать файл</button>
+        <small>txt, pdf — только один источник: файл или текст</small>
         <input type="file" id="file" accept=".txt,.pdf" hidden>
       </div>
 
@@ -219,7 +220,26 @@ function closeAuth(){document.getElementById('authModal').classList.remove('open
 function switchTab(t){document.getElementById('tabLogin').classList.toggle('active',t==='login');document.getElementById('tabReg').classList.toggle('active',t==='reg');document.getElementById('formLogin').style.display=t==='login'?'flex':'none';document.getElementById('formReg').style.display=t==='reg'?'flex':'none';}
 document.getElementById('authModal').addEventListener('click',e=>{if(e.target.id==='authModal')closeAuth();});
 
-async function loadFile(file){pickedFile=file;dropText.textContent=file.name;if(/\.pdf$/i.test(file.name)){statusEl.textContent='PDF: текст извлечётся на сервере при генерации';}else{textEl.value=await file.text();statusEl.textContent='';}}
+const dropClear=document.getElementById('dropClear');
+function setDropState(name){dropText.textContent=name;dropClear.style.display=name==='Перетащите файл сюда'?'none':'inline-block';}
+function clearFile(){pickedFile=null;fileEl.value='';setDropState('Перетащите файл сюда');textEl.disabled=false;statusEl.textContent='';}
+dropClear.onclick=e=>{e.stopPropagation();clearFile();};
+async function loadFile(file){
+  if(/\.txt$/i.test(file.name)){
+    // txt просто подставляем в поле — дальше работаем как с ручным текстом
+    clearFile();
+    textEl.value=await file.text();
+    statusEl.textContent='';
+    return;
+  }
+  // pdf: текст нельзя показать — блокируем ручной ввод, чтобы не было двух источников
+  pickedFile=file;fileEl.value='';
+  textEl.value='';textEl.disabled=true;
+  setDropState(file.name);
+  statusEl.textContent='PDF: текст извлечётся на сервере при генерации';
+}
+// начал печатать — сбрасываем файл
+document.getElementById('text').addEventListener('input',()=>{if(pickedFile)clearFile();});
 drop.onclick=()=>fileEl.click();
 fileEl.onchange=()=>fileEl.files[0]&&loadFile(fileEl.files[0]);
 ['dragover','dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.toggle('over',ev==='dragover');if(ev==='drop'&&e.dataTransfer.files[0])loadFile(e.dataTransfer.files[0]);}));
