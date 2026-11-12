@@ -1,23 +1,17 @@
 # Озвучечка — веб-сервис озвучки текста (Flask + Piper TTS, много языков).
-# Функции: txt/pdf/ручной ввод, 39 голосов, авторизация, история, отзывы, авто-перевод.
+# Функции: txt/pdf/ручной ввод, 39 голосов, авто-перевод на язык голоса.
 # Запуск: python app.py  ->  http://127.0.0.1:5000
-import io, json, os, sqlite3, threading, time, urllib.parse, urllib.request
-import datetime
+import io, json, os, re, threading, time, urllib.parse, urllib.request
 from collections import OrderedDict
 from pathlib import Path
 
-from flask import (Flask, jsonify, redirect, render_template, request,
-                   send_file, session, url_for)
+from flask import Flask, jsonify, render_template, request, send_file
 from piper import PiperVoice
 from piper.config import SynthesisConfig
 from lameenc import Encoder
-from werkzeug.security import check_password_hash, generate_password_hash
 
 BASE = Path(__file__).parent
 VOICES_DIR = BASE / "voices"
-DATA_DIR = BASE / "data"
-AUDIO_DIR = DATA_DIR / "audio"
-DB_PATH = DATA_DIR / "app.db"
 HF_BASE = "https://huggingface.co/rhasspy/piper-voices/resolve/main/"
 MM_URL = "https://api.mymemory.translated.net/get?q={text}&langpair={src}|{dst}"
 LINGVA_URLS = [
@@ -77,44 +71,8 @@ TEMPO = {"slow": 1.15, "normal": 1.0, "fast": 0.85}
 MAX_CACHE = 2  # не больше 2 моделей в памяти — на Render free всего 512 МБ ОЗУ
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "ozvuchka-secret-change-me")
 _lock = threading.Lock()
 _cache = OrderedDict()
-
-# ---------- БД ----------
-def db():
-    DATA_DIR.mkdir(exist_ok=True)
-    AUDIO_DIR.mkdir(exist_ok=True)
-    con = sqlite3.connect(DB_PATH)
-    con.row_factory = sqlite3.Row
-    con.execute("""CREATE TABLE IF NOT EXISTS users(
-        id INTEGER PRIMARY KEY, username TEXT UNIQUE NOT NULL,
-        pass_hash TEXT NOT NULL, created REAL NOT NULL)""")
-    con.execute("""CREATE TABLE IF NOT EXISTS history(
-        id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL,
-        text TEXT NOT NULL, voice TEXT NOT NULL, audio BLOB,
-        created REAL NOT NULL)""")
-    con.execute("""CREATE TABLE IF NOT EXISTS reviews(
-        id INTEGER PRIMARY KEY, username TEXT NOT NULL, rating INTEGER NOT NULL,
-        text TEXT NOT NULL, created REAL NOT NULL)""")
-    # миграция: audio было именем файла -> теперь BLOB
-    cols = {r[1]: r[2] for r in con.execute("PRAGMA table_info(history)")}
-    if cols.get("audio") == "TEXT":
-        con.execute("ALTER TABLE history RENAME TO history_old")
-        con.execute("""CREATE TABLE history(
-            id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL,
-            text TEXT NOT NULL, voice TEXT NOT NULL, audio BLOB,
-            created REAL NOT NULL)""")
-        for row in con.execute("SELECT * FROM history_old"):
-            blob = None
-            if row[4]:
-                f = AUDIO_DIR / row[4]
-                if f.exists():
-                    blob = f.read_bytes()
-            con.execute("INSERT INTO history VALUES(?,?,?,?,?,?)",
-                        (row[0], row[1], row[2], row[3], blob, row[5]))
-        con.execute("DROP TABLE history_old")
-    return con
 
 # ---------- Голоса ----------
 def download_voice(info):
@@ -139,6 +97,23 @@ def get_voice(key):
         _cache.popitem(last=False)
     return voice
 
+# ---------- Текст ----------
+def split_text(text, limit):
+    parts = re.split(r"(?<=[.!?…\n])\s+", text)
+    out, buf = [], ""
+    for p in parts:
+        while len(p) > limit:
+            cut = p.rfind(" ", 0, limit)
+            if cut <= 0:
+                cut = limit
+            out.append(p[:cut]); p = p[cut:].strip()
+        if len(buf) + len(p) + 1 > limit and buf:
+            out.append(buf); buf = ""
+        buf = (buf + " " + p).strip()
+    if buf:
+        out.append(buf)
+    return out
+
 def synth_mp3(text, voice_key, tempo="normal"):
     voice = get_voice(voice_key)
     cfg = SynthesisConfig(length_scale=TEMPO.get(tempo, 1.0))
@@ -158,23 +133,6 @@ def synth_mp3(text, voice_key, tempo="normal"):
     return bytes(out)
 
 # ---------- Перевод ----------
-def split_text(text, limit):
-    import re
-    parts = re.split(r"(?<=[.!?…\n])\s+", text)
-    out, buf = [], ""
-    for p in parts:
-        while len(p) > limit:
-            cut = p.rfind(" ", 0, limit)
-            if cut <= 0:
-                cut = limit
-            out.append(p[:cut]); p = p[cut:].strip()
-        if len(buf) + len(p) + 1 > limit and buf:
-            out.append(buf); buf = ""
-        buf = (buf + " " + p).strip()
-    if buf:
-        out.append(buf)
-    return out
-
 def detect_lang(text):
     try:
         from langdetect import detect, DetectorFactory
@@ -183,8 +141,7 @@ def detect_lang(text):
     except Exception:
         return None
     # langdetect путает кириллицу: если есть чисто русские буквы — это русский
-    import re
-    if code in {"uk", "bg", "sr", "mk", "be", "sh", "cnr", "hr", "sl", "bs", "mk"} \
+    if code in {"uk", "bg", "sr", "mk", "be", "sh", "cnr", "hr", "sl", "bs"} \
             and re.search(r"[ыэъёЫЭЪЁ]", text):
         return "ru"
     return code
@@ -266,92 +223,13 @@ def extract_text(file_storage):
         return pdf_text(data)
     return data.decode("utf-8-sig", errors="replace").strip()
 
-def current_user():
-    uid = session.get("uid")
-    if not uid:
-        return None
-    con = db()
-    row = con.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
-    con.close()
-    return row
-
-# ---------- Страницы ----------
+# ---------- Страницы / API ----------
 @app.get("/")
 def index():
-    con = db()
-    def fmt(rows):
-        out = []
-        for r in rows:
-            d = dict(r)
-            d["created"] = datetime.datetime.fromtimestamp(d["created"]).strftime("%d.%m.%Y %H:%M")
-            out.append(d)
-        return out
-    reviews = fmt(con.execute("SELECT username, rating, text, created FROM reviews ORDER BY id DESC LIMIT 20").fetchall())
-    history = []
-    user = current_user()
-    if user:
-        history = fmt(con.execute(
-            "SELECT id, text, voice, audio, created FROM history WHERE user_id=? ORDER BY id DESC LIMIT 50",
-            (user["id"],)).fetchall())
-    con.close()
     return render_template("index.html",
-                           voices={k: v["label"] for k, v in VOICES.items()},
-                           user=user, reviews=reviews, history=history)
+                           voices={k: v["label"] for k, v in VOICES.items()})
 
-@app.post("/register")
-def register():
-    username = (request.form.get("username") or "").strip()[:32]
-    password = request.form.get("password") or ""
-    if len(username) < 2 or len(password) < 4:
-        return "Логин мин. 2 символа, пароль мин. 4", 400
-    con = db()
-    try:
-        con.execute("INSERT INTO users(username, pass_hash, created) VALUES(?,?,?)",
-                    (username, generate_password_hash(password), time.time()))
-        con.commit()
-    except sqlite3.IntegrityError:
-        con.close()
-        return "Такой логин уже занят", 400
-    uid = con.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone()["id"]
-    con.close()
-    session["uid"] = uid
-    return redirect(url_for("index"))
-
-@app.post("/login")
-def login():
-    username = (request.form.get("username") or "").strip()
-    password = request.form.get("password") or ""
-    con = db()
-    row = con.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
-    con.close()
-    if row and check_password_hash(row["pass_hash"], password):
-        session["uid"] = row["id"]
-        return redirect(url_for("index"))
-    return "Неверный логин или пароль", 400
-
-@app.post("/logout")
-def logout():
-    session.pop("uid", None)
-    return redirect(url_for("index"))
-
-@app.post("/review")
-def review():
-    username = (request.form.get("username") or "Гость").strip()[:32] or "Гость"
-    try:
-        rating = max(1, min(5, int(request.form.get("rating", 5))))
-    except ValueError:
-        rating = 5
-    text = (request.form.get("text") or "").strip()[:1000]
-    if text:
-        con = db()
-        con.execute("INSERT INTO reviews(username, rating, text, created) VALUES(?,?,?,?)",
-                    (username, rating, text, time.time()))
-        con.commit()
-        con.close()
-    return redirect(url_for("index") + "#reviews")
-
-# ---------- API ----------
-def do_generate(text, voice, tempo, do_translate, filename=None):
+def do_generate(text, voice, tempo):
     if not text:
         return None, "Пустой текст"
     if len(text) > MAX_TEXT:
@@ -359,25 +237,17 @@ def do_generate(text, voice, tempo, do_translate, filename=None):
     if voice not in VOICES:
         return None, "Неизвестный голос"
     final_text = text
-    if do_translate:
-        try:
-            final_text = translate_text(text, VOICES[voice]["lang"])
-        except Exception as e:
-            # переводчик недоступен — озвучиваем исходный текст без ошибки
-            print(f"Перевод не удался, использую оригинал: {e}", flush=True)
+    try:
+        final_text = translate_text(text, VOICES[voice]["lang"])
+    except Exception as e:
+        # переводчик недоступен — озвучиваем исходный текст без ошибки
+        print(f"Перевод не удался, использую оригинал: {e}", flush=True)
     try:
         with _lock:
             mp3 = synth_mp3(final_text, voice, tempo)
     except Exception as e:
         return None, str(e)
-    return (mp3, final_text), None
-
-def save_history(user_id, text, voice, mp3):
-    con = db()
-    con.execute("INSERT INTO history(user_id, text, voice, audio, created) VALUES(?,?,?,?,?)",
-                (user_id, text[:2000], voice, mp3, time.time()))
-    con.commit()
-    con.close()
+    return mp3, None
 
 @app.post("/api/generate")
 def generate():
@@ -385,24 +255,15 @@ def generate():
     text = (body.get("text") or "").strip()
     voice = body.get("voice", DEFAULT_VOICE)
     tempo = body.get("tempo", "normal")
-    do_translate = bool(body.get("translate", True))
-    result, err = do_generate(text, voice, tempo, do_translate)
+    mp3, err = do_generate(text, voice, tempo)
     if err:
-        return jsonify(error=err), 500 if "перевода" in err else 400
-    mp3, _ = result
-    user = current_user()
-    if user:
-        try:
-            save_history(user["id"], text, voice, mp3)
-        except Exception:
-            pass
+        return jsonify(error=err), 400
     return send_file(io.BytesIO(mp3), mimetype="audio/mpeg", download_name="voice.mp3")
 
 @app.post("/api/generate_file")
 def generate_file():
     voice = request.form.get("voice", DEFAULT_VOICE)
     tempo = request.form.get("tempo", "normal")
-    do_translate = request.form.get("translate", "1") == "1"
     f = request.files.get("file")
     if not f or not f.filename:
         return jsonify(error="Файл не выбран"), 400
@@ -410,16 +271,9 @@ def generate_file():
         text = extract_text(f)
     except Exception as e:
         return jsonify(error=f"Не удалось прочитать файл: {e}"), 400
-    result, err = do_generate(text, voice, tempo, do_translate)
+    mp3, err = do_generate(text, voice, tempo)
     if err:
-        return jsonify(error=err), 500 if "перевода" in err else 400
-    mp3, _ = result
-    user = current_user()
-    if user:
-        try:
-            save_history(user["id"], text, voice, mp3)
-        except Exception:
-            pass
+        return jsonify(error=err), 400
     return send_file(io.BytesIO(mp3), mimetype="audio/mpeg",
                      download_name=Path(f.filename).stem + ".mp3")
 
@@ -427,19 +281,6 @@ def generate_file():
 def ads_txt():
     # замените pub-XXX на ваш publisher ID из AdSense
     return "google.com, pub-XXXXXXXXXXXXXXXX, DIRECT, f08c47fec0942fa0\n", 200, {"Content-Type": "text/plain"}
-
-@app.get("/audio/<int:hid>")
-def audio(hid):
-    user = current_user()
-    if not user:
-        return "not found", 404
-    con = db()
-    row = con.execute("SELECT audio FROM history WHERE id=? AND user_id=?",
-                      (hid, user["id"])).fetchone()
-    con.close()
-    if not row or row["audio"] is None:
-        return "not found", 404
-    return send_file(io.BytesIO(row["audio"]), mimetype="audio/mpeg")
 
 if __name__ == "__main__":
     VOICES_DIR.mkdir(exist_ok=True)

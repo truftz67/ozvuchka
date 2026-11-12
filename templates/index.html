@@ -5,67 +5,39 @@
 <title>Озвучечка — озвучка текста голосами ИИ</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-  :root { --bg:#0b1020; --card:#151c33; --card2:#1c2545; --line:#2b3a67; --txt:#e8ecf8; --mut:#8b96b8; --acc:#6c8cff; --acc2:#9d6cff; }
+  :root { --bg:#0b1020; --card:#151c33; --line:#2b3a67; --txt:#e8ecf8; --mut:#8b96b8; --acc:#6c8cff; --acc2:#9d6cff; }
   * { box-sizing:border-box; }
   body { font-family:'Segoe UI',system-ui,sans-serif; margin:0; background:radial-gradient(1200px 600px at 80% -10%, #1b2a5e 0%, var(--bg) 55%); color:var(--txt); min-height:100vh; }
-  header { display:flex; align-items:center; gap:14px; padding:18px 28px; max-width:1100px; margin:0 auto; }
+  header { display:flex; align-items:center; padding:16px 20px; max-width:1100px; margin:0 auto; }
   .logo { display:flex; align-items:center; gap:12px; font-size:22px; font-weight:800; letter-spacing:.5px; }
-  .logo svg { width:44px; height:44px; }
-  nav { margin-left:auto; display:flex; gap:10px; align-items:center; }
-  nav a { color:var(--mut); text-decoration:none; font-size:14px; }
-  nav a:hover { color:var(--txt); }
-  .userbox { font-size:14px; color:var(--mut); display:flex; gap:10px; align-items:center; }
-  .btn { background:linear-gradient(135deg,var(--acc),var(--acc2)); border:0; color:#fff; padding:10px 18px; border-radius:10px; font-weight:600; cursor:pointer; font-size:14px; }
-  .btn.ghost { background:transparent; border:1px solid var(--line); color:var(--txt); }
-  .wrap { max-width:1100px; margin:0 auto; padding:0 20px 60px; display:grid; grid-template-columns:1fr 300px; gap:20px; }
-  @media (max-width:900px){ .wrap{grid-template-columns:1fr;} }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:18px; padding:24px; }
+  .logo svg { width:42px; height:42px; flex-shrink:0; }
+  .wrap { max-width:1100px; margin:0 auto; padding:0 16px 60px; display:grid; grid-template-columns:1fr 300px; gap:20px; }
+  @media (max-width:900px){ .wrap{grid-template-columns:1fr;} header{padding:14px 16px;} }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:18px; padding:22px; }
   h1 { font-size:20px; margin:0 0 4px; }
   .sub { color:var(--mut); font-size:13px; margin-bottom:16px; }
   label { display:block; font-size:12px; color:var(--mut); margin:12px 0 6px; text-transform:uppercase; letter-spacing:.5px; }
-  textarea { width:100%; min-height:170px; resize:vertical; background:#0d1330; color:var(--txt); border:1px solid var(--line); border-radius:12px; padding:12px; font-size:15px; font-family:inherit; }
+  textarea, input[type=text] { width:100%; min-height:170px; resize:vertical; background:#0d1330; color:var(--txt); border:1px solid var(--line); border-radius:12px; padding:12px; font-size:16px; font-family:inherit; }
+  textarea { min-height:150px; }
   .drop { border:2px dashed var(--line); border-radius:12px; padding:16px; text-align:center; color:var(--mut); cursor:pointer; transition:.15s; }
   .drop.over,.drop:hover { border-color:var(--acc); color:var(--txt); background:#0d1330; }
   .drop small { display:block; margin-top:4px; opacity:.7; }
   .row { display:flex; gap:12px; flex-wrap:wrap; }
-  .row>div { flex:1; min-width:150px; }
-  select,input[type=text],input[type=password] { width:100%; background:#0d1330; color:var(--txt); border:1px solid var(--line); border-radius:10px; padding:10px; font-size:14px; }
-  .check { display:flex; align-items:center; gap:8px; margin-top:14px; font-size:14px; color:var(--mut); }
-  .check input { accent-color:var(--acc); width:16px; height:16px; }
-  button.gen { margin-top:18px; width:100%; padding:14px; font-size:16px; font-weight:700; border:0; border-radius:12px; background:linear-gradient(135deg,var(--acc),var(--acc2)); color:#fff; cursor:pointer; transition:.15s; }
+  .row>div { flex:1; min-width:140px; }
+  select { width:100%; background:#0d1330; color:var(--txt); border:1px solid var(--line); border-radius:10px; padding:12px; font-size:16px; }
+  .note { margin-top:14px; font-size:13px; color:var(--mut); }
+  button.gen { margin-top:18px; width:100%; padding:15px; font-size:16px; font-weight:700; border:0; border-radius:12px; background:linear-gradient(135deg,var(--acc),var(--acc2)); color:#fff; cursor:pointer; transition:.15s; }
   button.gen:hover:not(:disabled){ filter:brightness(1.15); }
   button.gen:disabled{ opacity:.55; cursor:wait; }
   #status{ margin-top:12px; font-size:14px; color:var(--mut); min-height:20px; }
   #status.err{ color:#ff7b7b; }
   audio{ width:100%; margin-top:10px; }
-  a.dl{ display:inline-block; margin-top:10px; padding:10px 18px; background:#22c55e; color:#052e16; text-decoration:none; border-radius:10px; font-weight:700; font-size:14px; }
+  a.dl{ display:inline-block; margin-top:10px; padding:11px 18px; background:#22c55e; color:#052e16; text-decoration:none; border-radius:10px; font-weight:700; font-size:14px; }
   /* Реклама */
-  .ad { background:#0d1330; border:1px dashed var(--line); border-radius:12px; padding:18px; text-align:center; color:var(--mut); font-size:12px; margin:14px 0; }
+  .ad { background:#0d1330; border:1px dashed var(--line); border-radius:12px; padding:16px; text-align:center; color:var(--mut); font-size:12px; margin:14px 0; }
   .ad .tag{ font-size:10px; text-transform:uppercase; letter-spacing:1px; opacity:.6; }
-  .ad .box{ margin-top:8px; height:90px; display:flex; align-items:center; justify-content:center; background:#111a3d; border-radius:8px; }
-  /* История */
-  .hist-item{ border-top:1px solid var(--line); padding:12px 0; font-size:13px; }
-  .hist-item:first-of-type{ border-top:0; }
-  .hist-text{ color:var(--txt); margin-bottom:6px; white-space:pre-wrap; max-height:80px; overflow:auto; }
-  .hist-meta{ color:var(--mut); font-size:11px; display:flex; justify-content:space-between; gap:8px; align-items:center; }
-  .hist-item audio{ height:32px; width:100%; margin-top:6px; }
-  /* Отзывы */
-  .rev{ border-top:1px solid var(--line); padding:12px 0; }
-  .rev:first-of-type{ border-top:0; }
-  .stars{ color:#ffd166; letter-spacing:2px; }
-  .rev-name{ font-weight:600; font-size:13px; }
-  .rev-date{ color:var(--mut); font-size:11px; margin-left:8px; }
-  .rev-text{ font-size:13px; margin-top:4px; color:var(--txt); }
-  form.inline{ display:flex; flex-direction:column; gap:8px; margin-top:14px; }
-  /* Модалка */
-  .modal-bg{ position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; z-index:50; }
-  .modal-bg.open{ display:flex; }
-  .modal{ background:var(--card); border:1px solid var(--line); border-radius:16px; padding:26px; width:340px; }
-  .modal h2{ margin:0 0 14px; font-size:18px; }
-  .modal .err{ color:#ff7b7b; font-size:13px; margin-top:8px; min-height:16px; }
-  .tabs{ display:flex; gap:8px; margin-bottom:14px; }
-  .tabs button{ flex:1; padding:8px; border-radius:8px; border:1px solid var(--line); background:transparent; color:var(--mut); cursor:pointer; }
-  .tabs button.active{ background:var(--acc); color:#fff; border-color:var(--acc); }
+  .ad .box{ margin-top:8px; min-height:90px; display:flex; align-items:center; justify-content:center; background:#111a3d; border-radius:8px; padding:10px; }
+  .btn { background:transparent; border:1px solid var(--line); color:var(--txt); padding:6px 12px; border-radius:8px; font-size:12px; cursor:pointer; }
 </style>
 </head>
 <body>
@@ -81,24 +53,13 @@
     </svg>
     Озвучечка
   </div>
-  <nav>
-    <a href="#history">История</a>
-    <a href="#reviews">Отзывы</a>
-    {% if user %}
-    <div class="userbox">👤 {{ user.username }}
-      <form method="post" action="/logout" style="display:inline"><button class="btn ghost" style="padding:6px 12px">Выйти</button></form>
-    </div>
-    {% else %}
-    <button class="btn ghost" onclick="openAuth()">Войти</button>
-    {% endif %}
-  </nav>
 </header>
 
 <div class="wrap">
   <div>
     <div class="card">
       <h1>Озвучка текста</h1>
-      <div class="sub">39 голосов на 20+ языках • txt, pdf или ручной ввод • авто-перевод • файлы до 100 000 символов</div>
+      <div class="sub">39 голосов на 20+ языках • txt, pdf или ручной ввод • авто-перевод • до 100 000 символов</div>
 
       <label for="text">Текст вручную</label>
       <textarea id="text" placeholder="Вставьте или напишите текст сюда..."></textarea>
@@ -106,7 +67,7 @@
       <label>Или файл (.txt / .pdf)</label>
       <div class="drop" id="drop">
         <span id="dropText">Перетащите файл сюда</span>
-        <button type="button" id="dropClear" class="btn ghost" style="display:none;padding:4px 12px;font-size:12px;margin-top:6px">Убрать файл</button>
+        <button type="button" id="dropClear" class="btn" style="display:none;margin-top:6px">Убрать файл</button>
         <small>txt, pdf — только один источник: файл или текст</small>
         <input type="file" id="file" accept=".txt,.pdf" hidden>
       </div>
@@ -130,7 +91,7 @@
         </div>
       </div>
 
-      <label class="check"><input type="checkbox" id="translate" checked> Авто-перевод текста на язык голоса</label>
+      <div class="note">Текст автоматически переводится на язык выбранного голоса.</div>
 
       <button class="gen" id="gen">Сгенерировать</button>
       <div id="status"></div>
@@ -145,24 +106,6 @@
       <script>(adsbygoogle=window.adsbygoogle||[]).push({});</script> -->
       <div class="box">Место для рекламы — 728×90</div>
     </div>
-
-    {% if user %}
-    <div class="card" id="history">
-      <h1>Моя история</h1>
-      <div class="sub">Последние генерации — нажмите play для прослушивания</div>
-      {% for h in history %}
-      <div class="hist-item">
-        <div class="hist-text">{{ h.text[:300] }}{% if h.text|length > 300 %}…{% endif %}</div>
-        <div class="hist-meta">
-          <span>{{ voices.get(h.voice, h.voice) }} • {{ h.created }}</span>
-        </div>
-        <audio controls preload="none" src="/audio/{{ h.id }}"></audio>
-      </div>
-      {% else %}
-      <div class="sub">Пока пусто — сгенерируйте первую озвучку.</div>
-      {% endfor %}
-    </div>
-    {% endif %}
   </div>
 
   <div>
@@ -173,34 +116,10 @@
       <script src="https://plxxxxxxxxxx.com/xx/xx.js"></script> -->
       <div class="box">Рекламный блок</div>
     </div>
-
-    <div class="card" id="reviews">
-      <h1>Отзывы</h1>
-      <div class="sub">Что говорят пользователи</div>
-      {% for r in reviews %}
-      <div class="rev">
-        <div><span class="rev-name">{{ r.username }}</span><span class="rev-date">{{ r.created }}</span></div>
-        <div class="stars">{% for i in range(r.rating) %}★{% endfor %}{% for i in range(5 - r.rating) %}☆{% endfor %}</div>
-        <div class="rev-text">{{ r.text }}</div>
-      </div>
-      {% else %}
-      <div class="sub">Отзывов пока нет — будьте первым!</div>
-      {% endfor %}
-      <form class="inline" method="post" action="/review">
-        <input type="text" name="username" placeholder="Ваше имя" value="{{ user.username if user else '' }}">
-        <select name="rating">
-          <option value="5">★★★★★</option><option value="4">★★★★☆</option>
-          <option value="3">★★★☆☆</option><option value="2">★★☆☆☆</option>
-          <option value="1">★☆☆☆☆</option>
-        </select>
-        <textarea name="text" placeholder="Ваш отзыв..." style="min-height:70px"></textarea>
-        <button class="btn" type="submit">Отправить отзыв</button>
-      </form>
-    </div>
   </div>
 </div>
 
-<!-- РЕКЛАМА 3: нижний баннер перед футером -->
+<!-- РЕКЛАМА 3: нижний баннер -->
 <div class="wrap" style="padding-top:0">
   <div class="ad" id="ad-bottom" style="grid-column:1/-1">
     <div class="tag">Реклама</div>
@@ -208,73 +127,40 @@
   </div>
 </div>
 
-<!-- Модалка входа/регистрации -->
-<div class="modal-bg" id="authModal">
-  <div class="modal">
-    <h2>Аккаунт</h2>
-    <div class="tabs">
-      <button id="tabLogin" class="active" onclick="switchTab('login')">Вход</button>
-      <button id="tabReg" onclick="switchTab('reg')">Регистрация</button>
-    </div>
-    <form id="formLogin" method="post" action="/login" class="inline">
-      <input type="text" name="username" placeholder="Логин" required>
-      <input type="password" name="password" placeholder="Пароль" required>
-      <button class="btn" type="submit">Войти</button>
-      <div class="err" id="errLogin"></div>
-    </form>
-    <form id="formReg" method="post" action="/register" class="inline" style="display:none">
-      <input type="text" name="username" placeholder="Логин" required>
-      <input type="password" name="password" placeholder="Пароль (мин. 4 символа)" required>
-      <button class="btn" type="submit">Создать аккаунт</button>
-      <div class="err" id="errReg"></div>
-    </form>
-    <div style="margin-top:10px;text-align:center"><a href="#" onclick="closeAuth();return false" style="color:var(--mut);font-size:13px">Закрыть</a></div>
-  </div>
-</div>
-
 <script>
-const textEl=document.getElementById('text'),fileEl=document.getElementById('file'),drop=document.getElementById('drop'),dropText=document.getElementById('dropText'),statusEl=document.getElementById('status'),resultEl=document.getElementById('result'),btn=document.getElementById('gen');
+const textEl=document.getElementById('text'),fileEl=document.getElementById('file'),drop=document.getElementById('drop'),dropText=document.getElementById('dropText'),statusEl=document.getElementById('status'),resultEl=document.getElementById('result'),btn=document.getElementById('gen'),dropClear=document.getElementById('dropClear');
 let pickedFile=null;
 
-function openAuth(){document.getElementById('authModal').classList.add('open');}
-function closeAuth(){document.getElementById('authModal').classList.remove('open');}
-function switchTab(t){document.getElementById('tabLogin').classList.toggle('active',t==='login');document.getElementById('tabReg').classList.toggle('active',t==='reg');document.getElementById('formLogin').style.display=t==='login'?'flex':'none';document.getElementById('formReg').style.display=t==='reg'?'flex':'none';}
-document.getElementById('authModal').addEventListener('click',e=>{if(e.target.id==='authModal')closeAuth();});
-
-const dropClear=document.getElementById('dropClear');
 function setDropState(name){dropText.textContent=name;dropClear.style.display=name==='Перетащите файл сюда'?'none':'inline-block';}
 function clearFile(){pickedFile=null;fileEl.value='';setDropState('Перетащите файл сюда');textEl.disabled=false;statusEl.textContent='';}
 dropClear.onclick=e=>{e.stopPropagation();clearFile();};
 async function loadFile(file){
   if(/\.txt$/i.test(file.name)){
-    // txt просто подставляем в поле — дальше работаем как с ручным текстом
     clearFile();
     textEl.value=await file.text();
     statusEl.textContent='';
     return;
   }
-  // pdf: текст нельзя показать — блокируем ручной ввод, чтобы не было двух источников
   pickedFile=file;fileEl.value='';
   textEl.value='';textEl.disabled=true;
   setDropState(file.name);
   statusEl.textContent='PDF: текст извлечётся на сервере при генерации';
 }
-// начал печатать — сбрасываем файл
 document.getElementById('text').addEventListener('input',()=>{if(pickedFile)clearFile();});
 drop.onclick=()=>fileEl.click();
 fileEl.onchange=()=>fileEl.files[0]&&loadFile(fileEl.files[0]);
 ['dragover','dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.toggle('over',ev==='dragover');if(ev==='drop'&&e.dataTransfer.files[0])loadFile(e.dataTransfer.files[0]);}));
 
 btn.onclick=async()=>{
-  const voice=document.getElementById('voice').value,tempo=document.getElementById('tempo').value,translate=document.getElementById('translate').checked;
+  const voice=document.getElementById('voice').value,tempo=document.getElementById('tempo').value;
   resultEl.innerHTML='';btn.disabled=true;statusEl.className='';statusEl.textContent='Генерация... (перевод и синтез могут занять до минуты)';
   let resp;
   try{
     if(pickedFile&&/\.pdf$/i.test(pickedFile.name)){
-      const fd=new FormData();fd.append('file',pickedFile);fd.append('voice',voice);fd.append('tempo',tempo);fd.append('translate',translate?'1':'0');
+      const fd=new FormData();fd.append('file',pickedFile);fd.append('voice',voice);fd.append('tempo',tempo);
       resp=await fetch('/api/generate_file',{method:'POST',body:fd});
     }else{
-      resp=await fetch('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:textEl.value,voice,tempo,translate})});
+      resp=await fetch('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:textEl.value,voice,tempo})});
     }
     if(!resp.ok){const j=await resp.json().catch(()=>({}));throw new Error(j.error||('Ошибка '+resp.status));}
     const blob=await resp.blob(),url=URL.createObjectURL(blob);
