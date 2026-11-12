@@ -1,0 +1,8 @@
+.git
+.idea
+__pycache__
+*.pyc
+data/
+voices/*.onnx
+voices/*.onnx.json
+*.mp3
