@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.idea/
+_part*.mp3
+voices/*.onnx
+voices/*.onnx.json

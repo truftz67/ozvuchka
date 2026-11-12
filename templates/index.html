@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Озвучка текста</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; background: #0f172a; color: #e2e8f0; min-height: 100vh; display: flex; justify-content: center; padding: 32px 16px; }
+  .card { width: 100%; max-width: 720px; background: #1e293b; border-radius: 16px; padding: 28px; box-shadow: 0 10px 40px rgba(0,0,0,.4); }
+  h1 { margin: 0 0 20px; font-size: 22px; }
+  label { display: block; font-size: 13px; color: #94a3b8; margin: 14px 0 6px; }
+  textarea { width: 100%; min-height: 180px; resize: vertical; background: #0f172a; color: #e2e8f0; border: 1px solid #334155; border-radius: 10px; padding: 12px; font-size: 15px; font-family: inherit; }
+  .drop { border: 2px dashed #475569; border-radius: 10px; padding: 18px; text-align: center; color: #94a3b8; cursor: pointer; transition: .15s; }
+  .drop.over, .drop:hover { border-color: #38bdf8; color: #e2e8f0; background: #0f172a; }
+  .drop small { display: block; margin-top: 4px; opacity: .7; }
+  .row { display: flex; gap: 14px; flex-wrap: wrap; }
+  .row > div { flex: 1; min-width: 160px; }
+  select { width: 100%; background: #0f172a; color: #e2e8f0; border: 1px solid #334155; border-radius: 10px; padding: 10px; font-size: 15px; }
+  button { margin-top: 20px; width: 100%; padding: 14px; font-size: 16px; font-weight: 600; border: 0; border-radius: 10px; background: #38bdf8; color: #082f49; cursor: pointer; transition: .15s; }
+  button:hover:not(:disabled) { background: #7dd3fc; }
+  button:disabled { opacity: .5; cursor: wait; }
+  #status { margin-top: 14px; font-size: 14px; color: #94a3b8; min-height: 20px; }
+  #result { margin-top: 8px; }
+  audio { width: 100%; margin-top: 10px; }
+  a.dl { display: inline-block; margin-top: 10px; padding: 10px 18px; background: #22c55e; color: #052e16; text-decoration: none; border-radius: 10px; font-weight: 600; }
+  a.dl:hover { background: #4ade80; }
+  .err { color: #f87171; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Озвучка текста</h1>
+
+  <label for="text">Текст вручную</label>
+  <textarea id="text" placeholder="Вставьте или напишите текст сюда..."></textarea>
+
+  <label>Или файл (.txt / .pdf) — перетащите или нажмите</label>
+  <div class="drop" id="drop">
+    <span id="dropText">Перетащите файл сюда</span>
+    <small>txt, pdf — текст подставится в поле выше</small>
+    <input type="file" id="file" accept=".txt,.pdf" hidden>
+  </div>
+
+  <div class="row">
+    <div>
+      <label for="voice">Голос</label>
+      <select id="voice">
+        {% for id, name in voices.items() %}
+        <option value="{{ id }}">{{ name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="tempo">Темп</label>
+      <select id="tempo">
+        <option value="slow">Медленно</option>
+        <option value="normal" selected>Обычно</option>
+        <option value="fast">Быстро</option>
+      </select>
+    </div>
+  </div>
+
+  <button id="gen">Сгенерировать</button>
+  <div id="status"></div>
+  <div id="result"></div>
+</div>
+
+<script>
+const textEl = document.getElementById('text');
+const fileEl = document.getElementById('file');
+const drop = document.getElementById('drop');
+const dropText = document.getElementById('dropText');
+const statusEl = document.getElementById('status');
+const resultEl = document.getElementById('result');
+const btn = document.getElementById('gen');
+let pickedFile = null;
+
+// --- drag & drop / выбор файла: текст подставляем в textarea ---
+async function loadFile(file) {
+  pickedFile = file;
+  dropText.textContent = file.name;
+  if (/\.pdf$/i.test(file.name)) {
+    statusEl.textContent = 'PDF: текст извлечётся на сервере при генерации';
+  } else {
+    textEl.value = await file.text();
+    statusEl.textContent = '';
+  }
+}
+drop.onclick = () => fileEl.click();
+fileEl.onchange = () => fileEl.files[0] && loadFile(fileEl.files[0]);
+['dragover','dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => {
+  e.preventDefault();
+  drop.classList.toggle('over', ev === 'dragover');
+  if (ev === 'drop' && e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+}));
+
+// --- генерация ---
+btn.onclick = async () => {
+  const voice = document.getElementById('voice').value;
+  const tempo = document.getElementById('tempo').value;
+  resultEl.innerHTML = '';
+  btn.disabled = true;
+  statusEl.className = ''; statusEl.textContent = 'Генерация... (может занять до минуты)';
+
+  let resp;
+  try {
+    if (pickedFile && /\.pdf$/i.test(pickedFile.name)) {
+      const fd = new FormData();
+      fd.append('file', pickedFile);
+      fd.append('voice', voice); fd.append('tempo', tempo);
+      resp = await fetch('/api/generate_file', {method: 'POST', body: fd});
+    } else {
+      resp = await fetch('/api/generate', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({text: textEl.value, voice, tempo})
+      });
+    }
+    if (!resp.ok) {
+      const j = await resp.json().catch(() => ({}));
+      throw new Error(j.error || ('Ошибка ' + resp.status));
+    }
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    statusEl.textContent = 'Готово!';
+    resultEl.innerHTML = `<audio controls src="${url}"></audio>
+      <br><a class="dl" href="${url}" download="voice.mp3">Скачать mp3</a>`;
+  } catch (e) {
+    statusEl.className = 'err';
+    statusEl.textContent = e.message;
+  } finally {
+    btn.disabled = false;
+  }
+};
+</script>
+</body>
+</html>
