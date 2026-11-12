@@ -2,5 +2,6 @@ __pycache__/
 *.pyc
 .idea/
 _part*.mp3
+data/
 voices/*.onnx
 voices/*.onnx.json

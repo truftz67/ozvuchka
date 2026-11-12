@@ -2,135 +2,245 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<title>Озвучка текста</title>
+<title>Озвучечка — озвучка текста голосами ИИ</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-  * { box-sizing: border-box; }
-  body { font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; background: #0f172a; color: #e2e8f0; min-height: 100vh; display: flex; justify-content: center; padding: 32px 16px; }
-  .card { width: 100%; max-width: 720px; background: #1e293b; border-radius: 16px; padding: 28px; box-shadow: 0 10px 40px rgba(0,0,0,.4); }
-  h1 { margin: 0 0 20px; font-size: 22px; }
-  label { display: block; font-size: 13px; color: #94a3b8; margin: 14px 0 6px; }
-  textarea { width: 100%; min-height: 180px; resize: vertical; background: #0f172a; color: #e2e8f0; border: 1px solid #334155; border-radius: 10px; padding: 12px; font-size: 15px; font-family: inherit; }
-  .drop { border: 2px dashed #475569; border-radius: 10px; padding: 18px; text-align: center; color: #94a3b8; cursor: pointer; transition: .15s; }
-  .drop.over, .drop:hover { border-color: #38bdf8; color: #e2e8f0; background: #0f172a; }
-  .drop small { display: block; margin-top: 4px; opacity: .7; }
-  .row { display: flex; gap: 14px; flex-wrap: wrap; }
-  .row > div { flex: 1; min-width: 160px; }
-  select { width: 100%; background: #0f172a; color: #e2e8f0; border: 1px solid #334155; border-radius: 10px; padding: 10px; font-size: 15px; }
-  button { margin-top: 20px; width: 100%; padding: 14px; font-size: 16px; font-weight: 600; border: 0; border-radius: 10px; background: #38bdf8; color: #082f49; cursor: pointer; transition: .15s; }
-  button:hover:not(:disabled) { background: #7dd3fc; }
-  button:disabled { opacity: .5; cursor: wait; }
-  #status { margin-top: 14px; font-size: 14px; color: #94a3b8; min-height: 20px; }
-  #result { margin-top: 8px; }
-  audio { width: 100%; margin-top: 10px; }
-  a.dl { display: inline-block; margin-top: 10px; padding: 10px 18px; background: #22c55e; color: #052e16; text-decoration: none; border-radius: 10px; font-weight: 600; }
-  a.dl:hover { background: #4ade80; }
-  .err { color: #f87171; }
+  :root { --bg:#0b1020; --card:#151c33; --card2:#1c2545; --line:#2b3a67; --txt:#e8ecf8; --mut:#8b96b8; --acc:#6c8cff; --acc2:#9d6cff; }
+  * { box-sizing:border-box; }
+  body { font-family:'Segoe UI',system-ui,sans-serif; margin:0; background:radial-gradient(1200px 600px at 80% -10%, #1b2a5e 0%, var(--bg) 55%); color:var(--txt); min-height:100vh; }
+  header { display:flex; align-items:center; gap:14px; padding:18px 28px; max-width:1100px; margin:0 auto; }
+  .logo { display:flex; align-items:center; gap:12px; font-size:22px; font-weight:800; letter-spacing:.5px; }
+  .logo svg { width:44px; height:44px; }
+  nav { margin-left:auto; display:flex; gap:10px; align-items:center; }
+  nav a { color:var(--mut); text-decoration:none; font-size:14px; }
+  nav a:hover { color:var(--txt); }
+  .userbox { font-size:14px; color:var(--mut); display:flex; gap:10px; align-items:center; }
+  .btn { background:linear-gradient(135deg,var(--acc),var(--acc2)); border:0; color:#fff; padding:10px 18px; border-radius:10px; font-weight:600; cursor:pointer; font-size:14px; }
+  .btn.ghost { background:transparent; border:1px solid var(--line); color:var(--txt); }
+  .wrap { max-width:1100px; margin:0 auto; padding:0 20px 60px; display:grid; grid-template-columns:1fr 300px; gap:20px; }
+  @media (max-width:900px){ .wrap{grid-template-columns:1fr;} }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:18px; padding:24px; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  .sub { color:var(--mut); font-size:13px; margin-bottom:16px; }
+  label { display:block; font-size:12px; color:var(--mut); margin:12px 0 6px; text-transform:uppercase; letter-spacing:.5px; }
+  textarea { width:100%; min-height:170px; resize:vertical; background:#0d1330; color:var(--txt); border:1px solid var(--line); border-radius:12px; padding:12px; font-size:15px; font-family:inherit; }
+  .drop { border:2px dashed var(--line); border-radius:12px; padding:16px; text-align:center; color:var(--mut); cursor:pointer; transition:.15s; }
+  .drop.over,.drop:hover { border-color:var(--acc); color:var(--txt); background:#0d1330; }
+  .drop small { display:block; margin-top:4px; opacity:.7; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; }
+  .row>div { flex:1; min-width:150px; }
+  select,input[type=text],input[type=password] { width:100%; background:#0d1330; color:var(--txt); border:1px solid var(--line); border-radius:10px; padding:10px; font-size:14px; }
+  .check { display:flex; align-items:center; gap:8px; margin-top:14px; font-size:14px; color:var(--mut); }
+  .check input { accent-color:var(--acc); width:16px; height:16px; }
+  button.gen { margin-top:18px; width:100%; padding:14px; font-size:16px; font-weight:700; border:0; border-radius:12px; background:linear-gradient(135deg,var(--acc),var(--acc2)); color:#fff; cursor:pointer; transition:.15s; }
+  button.gen:hover:not(:disabled){ filter:brightness(1.15); }
+  button.gen:disabled{ opacity:.55; cursor:wait; }
+  #status{ margin-top:12px; font-size:14px; color:var(--mut); min-height:20px; }
+  #status.err{ color:#ff7b7b; }
+  audio{ width:100%; margin-top:10px; }
+  a.dl{ display:inline-block; margin-top:10px; padding:10px 18px; background:#22c55e; color:#052e16; text-decoration:none; border-radius:10px; font-weight:700; font-size:14px; }
+  /* Реклама */
+  .ad { background:#0d1330; border:1px dashed var(--line); border-radius:12px; padding:18px; text-align:center; color:var(--mut); font-size:12px; margin:14px 0; }
+  .ad .tag{ font-size:10px; text-transform:uppercase; letter-spacing:1px; opacity:.6; }
+  .ad .box{ margin-top:8px; height:90px; display:flex; align-items:center; justify-content:center; background:#111a3d; border-radius:8px; }
+  /* История */
+  .hist-item{ border-top:1px solid var(--line); padding:12px 0; font-size:13px; }
+  .hist-item:first-of-type{ border-top:0; }
+  .hist-text{ color:var(--txt); margin-bottom:6px; white-space:pre-wrap; max-height:80px; overflow:auto; }
+  .hist-meta{ color:var(--mut); font-size:11px; display:flex; justify-content:space-between; gap:8px; align-items:center; }
+  .hist-item audio{ height:32px; width:100%; margin-top:6px; }
+  /* Отзывы */
+  .rev{ border-top:1px solid var(--line); padding:12px 0; }
+  .rev:first-of-type{ border-top:0; }
+  .stars{ color:#ffd166; letter-spacing:2px; }
+  .rev-name{ font-weight:600; font-size:13px; }
+  .rev-date{ color:var(--mut); font-size:11px; margin-left:8px; }
+  .rev-text{ font-size:13px; margin-top:4px; color:var(--txt); }
+  form.inline{ display:flex; flex-direction:column; gap:8px; margin-top:14px; }
+  /* Модалка */
+  .modal-bg{ position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; z-index:50; }
+  .modal-bg.open{ display:flex; }
+  .modal{ background:var(--card); border:1px solid var(--line); border-radius:16px; padding:26px; width:340px; }
+  .modal h2{ margin:0 0 14px; font-size:18px; }
+  .modal .err{ color:#ff7b7b; font-size:13px; margin-top:8px; min-height:16px; }
+  .tabs{ display:flex; gap:8px; margin-bottom:14px; }
+  .tabs button{ flex:1; padding:8px; border-radius:8px; border:1px solid var(--line); background:transparent; color:var(--mut); cursor:pointer; }
+  .tabs button.active{ background:var(--acc); color:#fff; border-color:var(--acc); }
 </style>
 </head>
 <body>
-<div class="card">
-  <h1>Озвучка текста</h1>
+<header>
+  <div class="logo">
+    <svg viewBox="0 0 48 48" fill="none">
+      <defs><linearGradient id="g" x1="0" y1="0" x2="48" y2="48"><stop stop-color="#6c8cff"/><stop offset="1" stop-color="#9d6cff"/></linearGradient></defs>
+      <rect x="4" y="4" width="40" height="40" rx="12" fill="url(#g)"/>
+      <path d="M14 20v8a6 6 0 0 0 12 0v-8" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/>
+      <rect x="10" y="18" width="5" height="9" rx="2.5" fill="#fff"/>
+      <rect x="33" y="18" width="5" height="9" rx="2.5" fill="#fff"/>
+      <path d="M24 34v5M19 39h10" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/>
+    </svg>
+    Озвучечка
+  </div>
+  <nav>
+    <a href="#history">История</a>
+    <a href="#reviews">Отзывы</a>
+    {% if user %}
+    <div class="userbox">👤 {{ user.username }}
+      <form method="post" action="/logout" style="display:inline"><button class="btn ghost" style="padding:6px 12px">Выйти</button></form>
+    </div>
+    {% else %}
+    <button class="btn ghost" onclick="openAuth()">Войти</button>
+    {% endif %}
+  </nav>
+</header>
 
-  <label for="text">Текст вручную</label>
-  <textarea id="text" placeholder="Вставьте или напишите текст сюда..."></textarea>
+<div class="wrap">
+  <div>
+    <div class="card">
+      <h1>Озвучка текста</h1>
+      <div class="sub">39 голосов на 20+ языках • txt, pdf или ручной ввод • авто-перевод • файлы до 100 000 символов</div>
 
-  <label>Или файл (.txt / .pdf) — перетащите или нажмите</label>
-  <div class="drop" id="drop">
-    <span id="dropText">Перетащите файл сюда</span>
-    <small>txt, pdf — текст подставится в поле выше</small>
-    <input type="file" id="file" accept=".txt,.pdf" hidden>
+      <label for="text">Текст вручную</label>
+      <textarea id="text" placeholder="Вставьте или напишите текст сюда..."></textarea>
+
+      <label>Или файл (.txt / .pdf)</label>
+      <div class="drop" id="drop">
+        <span id="dropText">Перетащите файл сюда</span>
+        <small>txt, pdf — текст подставится в поле выше</small>
+        <input type="file" id="file" accept=".txt,.pdf" hidden>
+      </div>
+
+      <div class="row">
+        <div>
+          <label for="voice">Голос</label>
+          <select id="voice">
+            {% for id, name in voices.items() %}
+            <option value="{{ id }}">{{ name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="tempo">Темп</label>
+          <select id="tempo">
+            <option value="slow">Медленно</option>
+            <option value="normal" selected>Обычно</option>
+            <option value="fast">Быстро</option>
+          </select>
+        </div>
+      </div>
+
+      <label class="check"><input type="checkbox" id="translate" checked> Авто-перевод текста на язык голоса</label>
+
+      <button class="gen" id="gen">Сгенерировать</button>
+      <div id="status"></div>
+      <div id="result"></div>
+    </div>
+
+    <div class="ad"><div class="tag">Реклама</div><div class="box">Место для рекламы — 728×90</div></div>
+
+    {% if user %}
+    <div class="card" id="history">
+      <h1>Моя история</h1>
+      <div class="sub">Последние генерации — нажмите play для прослушивания</div>
+      {% for h in history %}
+      <div class="hist-item">
+        <div class="hist-text">{{ h.text[:300] }}{% if h.text|length > 300 %}…{% endif %}</div>
+        <div class="hist-meta">
+          <span>{{ voices.get(h.voice, h.voice) }} • {{ h.created }}</span>
+        </div>
+        <audio controls preload="none" src="/audio/{{ h.audio }}"></audio>
+      </div>
+      {% else %}
+      <div class="sub">Пока пусто — сгенерируйте первую озвучку.</div>
+      {% endfor %}
+    </div>
+    {% endif %}
   </div>
 
-  <div class="row">
-    <div>
-      <label for="voice">Голос</label>
-      <select id="voice">
-        {% for id, name in voices.items() %}
-        <option value="{{ id }}">{{ name }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div>
-      <label for="tempo">Темп</label>
-      <select id="tempo">
-        <option value="slow">Медленно</option>
-        <option value="normal" selected>Обычно</option>
-        <option value="fast">Быстро</option>
-      </select>
+  <div>
+    <div class="ad"><div class="tag">Реклама</div><div class="box">Рекламный блок</div></div>
+
+    <div class="card" id="reviews">
+      <h1>Отзывы</h1>
+      <div class="sub">Что говорят пользователи</div>
+      {% for r in reviews %}
+      <div class="rev">
+        <div><span class="rev-name">{{ r.username }}</span><span class="rev-date">{{ r.created }}</span></div>
+        <div class="stars">{% for i in range(r.rating) %}★{% endfor %}{% for i in range(5 - r.rating) %}☆{% endfor %}</div>
+        <div class="rev-text">{{ r.text }}</div>
+      </div>
+      {% else %}
+      <div class="sub">Отзывов пока нет — будьте первым!</div>
+      {% endfor %}
+      <form class="inline" method="post" action="/review">
+        <input type="text" name="username" placeholder="Ваше имя" value="{{ user.username if user else '' }}">
+        <select name="rating">
+          <option value="5">★★★★★</option><option value="4">★★★★☆</option>
+          <option value="3">★★★☆☆</option><option value="2">★★☆☆☆</option>
+          <option value="1">★☆☆☆☆</option>
+        </select>
+        <textarea name="text" placeholder="Ваш отзыв..." style="min-height:70px"></textarea>
+        <button class="btn" type="submit">Отправить отзыв</button>
+      </form>
     </div>
   </div>
+</div>
 
-  <button id="gen">Сгенерировать</button>
-  <div id="status"></div>
-  <div id="result"></div>
+<!-- Модалка входа/регистрации -->
+<div class="modal-bg" id="authModal">
+  <div class="modal">
+    <h2>Аккаунт</h2>
+    <div class="tabs">
+      <button id="tabLogin" class="active" onclick="switchTab('login')">Вход</button>
+      <button id="tabReg" onclick="switchTab('reg')">Регистрация</button>
+    </div>
+    <form id="formLogin" method="post" action="/login" class="inline">
+      <input type="text" name="username" placeholder="Логин" required>
+      <input type="password" name="password" placeholder="Пароль" required>
+      <button class="btn" type="submit">Войти</button>
+      <div class="err" id="errLogin"></div>
+    </form>
+    <form id="formReg" method="post" action="/register" class="inline" style="display:none">
+      <input type="text" name="username" placeholder="Логин" required>
+      <input type="password" name="password" placeholder="Пароль (мин. 4 символа)" required>
+      <button class="btn" type="submit">Создать аккаунт</button>
+      <div class="err" id="errReg"></div>
+    </form>
+    <div style="margin-top:10px;text-align:center"><a href="#" onclick="closeAuth();return false" style="color:var(--mut);font-size:13px">Закрыть</a></div>
+  </div>
 </div>
 
 <script>
-const textEl = document.getElementById('text');
-const fileEl = document.getElementById('file');
-const drop = document.getElementById('drop');
-const dropText = document.getElementById('dropText');
-const statusEl = document.getElementById('status');
-const resultEl = document.getElementById('result');
-const btn = document.getElementById('gen');
-let pickedFile = null;
+const textEl=document.getElementById('text'),fileEl=document.getElementById('file'),drop=document.getElementById('drop'),dropText=document.getElementById('dropText'),statusEl=document.getElementById('status'),resultEl=document.getElementById('result'),btn=document.getElementById('gen');
+let pickedFile=null;
 
-// --- drag & drop / выбор файла: текст подставляем в textarea ---
-async function loadFile(file) {
-  pickedFile = file;
-  dropText.textContent = file.name;
-  if (/\.pdf$/i.test(file.name)) {
-    statusEl.textContent = 'PDF: текст извлечётся на сервере при генерации';
-  } else {
-    textEl.value = await file.text();
-    statusEl.textContent = '';
-  }
-}
-drop.onclick = () => fileEl.click();
-fileEl.onchange = () => fileEl.files[0] && loadFile(fileEl.files[0]);
-['dragover','dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => {
-  e.preventDefault();
-  drop.classList.toggle('over', ev === 'dragover');
-  if (ev === 'drop' && e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
-}));
+function openAuth(){document.getElementById('authModal').classList.add('open');}
+function closeAuth(){document.getElementById('authModal').classList.remove('open');}
+function switchTab(t){document.getElementById('tabLogin').classList.toggle('active',t==='login');document.getElementById('tabReg').classList.toggle('active',t==='reg');document.getElementById('formLogin').style.display=t==='login'?'flex':'none';document.getElementById('formReg').style.display=t==='reg'?'flex':'none';}
+document.getElementById('authModal').addEventListener('click',e=>{if(e.target.id==='authModal')closeAuth();});
 
-// --- генерация ---
-btn.onclick = async () => {
-  const voice = document.getElementById('voice').value;
-  const tempo = document.getElementById('tempo').value;
-  resultEl.innerHTML = '';
-  btn.disabled = true;
-  statusEl.className = ''; statusEl.textContent = 'Генерация... (может занять до минуты)';
+async function loadFile(file){pickedFile=file;dropText.textContent=file.name;if(/\.pdf$/i.test(file.name)){statusEl.textContent='PDF: текст извлечётся на сервере при генерации';}else{textEl.value=await file.text();statusEl.textContent='';}}
+drop.onclick=()=>fileEl.click();
+fileEl.onchange=()=>fileEl.files[0]&&loadFile(fileEl.files[0]);
+['dragover','dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.toggle('over',ev==='dragover');if(ev==='drop'&&e.dataTransfer.files[0])loadFile(e.dataTransfer.files[0]);}));
 
+btn.onclick=async()=>{
+  const voice=document.getElementById('voice').value,tempo=document.getElementById('tempo').value,translate=document.getElementById('translate').checked;
+  resultEl.innerHTML='';btn.disabled=true;statusEl.className='';statusEl.textContent='Генерация... (перевод и синтез могут занять до минуты)';
   let resp;
-  try {
-    if (pickedFile && /\.pdf$/i.test(pickedFile.name)) {
-      const fd = new FormData();
-      fd.append('file', pickedFile);
-      fd.append('voice', voice); fd.append('tempo', tempo);
-      resp = await fetch('/api/generate_file', {method: 'POST', body: fd});
-    } else {
-      resp = await fetch('/api/generate', {
-        method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({text: textEl.value, voice, tempo})
-      });
+  try{
+    if(pickedFile&&/\.pdf$/i.test(pickedFile.name)){
+      const fd=new FormData();fd.append('file',pickedFile);fd.append('voice',voice);fd.append('tempo',tempo);fd.append('translate',translate?'1':'0');
+      resp=await fetch('/api/generate_file',{method:'POST',body:fd});
+    }else{
+      resp=await fetch('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:textEl.value,voice,tempo,translate})});
     }
-    if (!resp.ok) {
-      const j = await resp.json().catch(() => ({}));
-      throw new Error(j.error || ('Ошибка ' + resp.status));
-    }
-    const blob = await resp.blob();
-    const url = URL.createObjectURL(blob);
-    statusEl.textContent = 'Готово!';
-    resultEl.innerHTML = `<audio controls src="${url}"></audio>
-      <br><a class="dl" href="${url}" download="voice.mp3">Скачать mp3</a>`;
-  } catch (e) {
-    statusEl.className = 'err';
-    statusEl.textContent = e.message;
-  } finally {
-    btn.disabled = false;
-  }
+    if(!resp.ok){const j=await resp.json().catch(()=>({}));throw new Error(j.error||('Ошибка '+resp.status));}
+    const blob=await resp.blob(),url=URL.createObjectURL(blob);
+    statusEl.textContent='Готово!';
+    resultEl.innerHTML=`<audio controls src="${url}"></audio><br><a class="dl" href="${url}" download="voice.mp3">Скачать mp3</a>`;
+  }catch(e){statusEl.className='err';statusEl.textContent=e.message;}
+  finally{btn.disabled=false;}
 };
 </script>
 </body>
