@@ -137,7 +137,14 @@
       <div id="result"></div>
     </div>
 
-    <div class="ad"><div class="tag">Реклама</div><div class="box">Место для рекламы — 728×90</div></div>
+    <!-- РЕКЛАМА 1: верхний баннер. Вставь сюда код рекламного блока (AdSense / Adsterra / Monetag) -->
+    <div class="ad" id="ad-top">
+      <div class="tag">Реклама</div>
+      <!-- Пример AdSense:
+      <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-XXXXXXXXXXXXXXXX" data-ad-slot="XXXXXXXXXX" data-ad-format="auto" data-full-width-responsive="true"></ins>
+      <script>(adsbygoogle=window.adsbygoogle||[]).push({});</script> -->
+      <div class="box">Место для рекламы — 728×90</div>
+    </div>
 
     {% if user %}
     <div class="card" id="history">
@@ -159,7 +166,13 @@
   </div>
 
   <div>
-    <div class="ad"><div class="tag">Реклама</div><div class="box">Рекламный блок</div></div>
+    <!-- РЕКЛАМА 2: боковой блок. Сюда код рекламного блока -->
+    <div class="ad" id="ad-side">
+      <div class="tag">Реклама</div>
+      <!-- Пример Adsterra native banner / Monetag:
+      <script src="https://plxxxxxxxxxx.com/xx/xx.js"></script> -->
+      <div class="box">Рекламный блок</div>
+    </div>
 
     <div class="card" id="reviews">
       <h1>Отзывы</h1>
@@ -184,6 +197,14 @@
         <button class="btn" type="submit">Отправить отзыв</button>
       </form>
     </div>
+  </div>
+</div>
+
+<!-- РЕКЛАМА 3: нижний баннер перед футером -->
+<div class="wrap" style="padding-top:0">
+  <div class="ad" id="ad-bottom" style="grid-column:1/-1">
+    <div class="tag">Реклама</div>
+    <div class="box">Место для рекламы</div>
   </div>
 </div>
 

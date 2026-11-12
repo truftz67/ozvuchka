@@ -363,7 +363,8 @@ def do_generate(text, voice, tempo, do_translate, filename=None):
         try:
             final_text = translate_text(text, VOICES[voice]["lang"])
         except Exception as e:
-            return None, f"Ошибка перевода: {e}"
+            # переводчик недоступен — озвучиваем исходный текст без ошибки
+            print(f"Перевод не удался, использую оригинал: {e}", flush=True)
     try:
         with _lock:
             mp3 = synth_mp3(final_text, voice, tempo)
@@ -421,6 +422,11 @@ def generate_file():
             pass
     return send_file(io.BytesIO(mp3), mimetype="audio/mpeg",
                      download_name=Path(f.filename).stem + ".mp3")
+
+@app.get("/ads.txt")
+def ads_txt():
+    # замените pub-XXX на ваш publisher ID из AdSense
+    return "google.com, pub-XXXXXXXXXXXXXXXX, DIRECT, f08c47fec0942fa0\n", 200, {"Content-Type": "text/plain"}
 
 @app.get("/audio/<int:hid>")
 def audio(hid):
